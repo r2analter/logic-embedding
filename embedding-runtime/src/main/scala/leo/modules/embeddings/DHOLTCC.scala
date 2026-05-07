@@ -6,7 +6,7 @@ import TPTP.THF
 import scala.annotation.tailrec
 
 /**
- * @author Daniel Renalter, 2025
+ * @author Rhea Ranalter, 2025/26
  */
 object DHOLTCC extends EmbeddingN {
   import DHOLEmbeddingUtils._
@@ -230,17 +230,15 @@ object DHOLTCC extends EmbeddingN {
             case THF.Eq =>
               if (targetType == bool) {
 //                println("infering left and right of " ++ formula.pretty)//DEBUG
-                val (lSubs, lObligations) = properInferType(variables, constants)(l)
+                val lSubs = properInferType(variables, constants)(l)
                 val lType = lSubs.find(_._1.name == "Alhpa").get 
 //                println("after infer type left: ") //DEBUG
 //                lSubs.map(x => println(x._1.pretty + ":" + x._2.pretty))
-                val (rSubs, rObligations) = properInferType(variables, constants)(r)
+                val rSubs = properInferType(variables, constants)(r)
                 val rType = rSubs.find(_._1.name == "Alhpa").get
 //                println("after infer type right: ")
 //                rSubs.map(x => println(x._1.pretty + ":" + x._2.pretty))
                 genObligation(variables, constants, context)(lType._2, rType._2) ++
-                (rObligations ++ lObligations).flatMap(x => genObligation(variables, constants, context)(x._1, x._2)) ++
-//                (rObligations ++ lObligations).map(x => (genObligation(variables, constants, context)(x._1, x._2))) ++
                 checkType(variables, constants, context)(l, lType._2) ++
                 checkType(variables, constants, context)(r, rType._2)
               }
@@ -318,7 +316,7 @@ object DHOLTCC extends EmbeddingN {
       auxUnApply(formula, Nil)
     }
 
-    private def properInferType(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)])(formula: THF.Formula): (List[(THF.Variable, THF.Type)], List[(THF.Formula, THF.Formula)]) = { 
+    private def properInferType(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)])(formula: THF.Formula): List[(THF.Variable, THF.Type)] = { 
       var varCnt = 0
       def getFreshTypeVar: THF.Type = { //the typos are features and prevent clashes with names in the problem file (:
         varCnt += 1
@@ -387,7 +385,7 @@ object DHOLTCC extends EmbeddingN {
             properInferTypeAux(variables, constants, arguments)(THF.FunctionTerm(n, Seq()), t)
         }
       }
-      solveUnificationProblem(properInferTypeAux(variables, constants, Nil)(formula, THF.Variable("Alhpa")), List[(THF.Variable, THF.Type)](), List[(THF.Formula, THF.Formula)]())
+      solveUnificationProblem(properInferTypeAux(variables, constants, Nil)(formula, THF.Variable("Alhpa")), List[(THF.Variable, THF.Type)]())
     }
 
     private def unsaveApplyFunction(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)], context: List[THF.Formula])(formula: THF.Formula, argument: THF.Formula) = formula match {
@@ -421,7 +419,7 @@ object DHOLTCC extends EmbeddingN {
         throw new EmbeddingException("Can't apply argument " + argument.pretty + " to function " + formula)
     }
 
-    private def solveUnificationProblem(equations: List[THF.Formula], substitutions: List[(THF.Variable, THF.Type)], obligations: List[(THF.Formula, THF.Formula)]): (List[(THF.Variable, THF.Type)], List[(THF.Formula, THF.Formula)]) = { //formula is either function term or variable
+    private def solveUnificationProblem(equations: List[THF.Formula], substitutions: List[(THF.Variable, THF.Type)]): List[(THF.Variable, THF.Type)] = { //formula is either function term or variable
 // DEBUG
 /*
       println("=============================")
@@ -432,51 +430,51 @@ object DHOLTCC extends EmbeddingN {
 //        println("unifying " + equations.head)
         equations.head match {
           case THF.BinaryFormula(_, x, y) if (x == y) =>
-            solveUnificationProblem(equations.tail, substitutions, obligations)
+            solveUnificationProblem(equations.tail, substitutions)
           case THF.BinaryFormula(_, l@THF.BinaryFormula(THF.App, _, _), r@THF.BinaryFormula(THF.App, _, _)) =>
             var (lb, largs) = unApply(l)
             var (rb, rargs) = unApply(r)
             if (lb == rb)
               solveUnificationProblem(equations.tail ++
-                (largs.lazyZip(rargs) map ((x, y) => THF.BinaryFormula(THF.Eq, x, y))), substitutions, obligations)
+                (largs.lazyZip(rargs) map ((x, y) => THF.BinaryFormula(THF.Eq, x, y))), substitutions)
             else
               throw new EmbeddingException("Function missmatch in unification: " + l.pretty + " and " + r.pretty)
           case THF.BinaryFormula(_, THF.QuantifiedFormula(THF.!>, lv+:lvl, lf), THF.QuantifiedFormula(THF.!>, rv+:rvl, rf)) =>
             solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, lv._2, rv._2))
               ++ List(THF.BinaryFormula(THF.Eq, THF.QuantifiedFormula(THF.!>, lvl, lf),
-                THF.QuantifiedFormula(THF.!>, rvl, rf))), substitutions, obligations)
+                THF.QuantifiedFormula(THF.!>, rvl, rf))), substitutions)
           case THF.BinaryFormula(_, THF.QuantifiedFormula(THF.!>, lv+:lvl, lf), THF.BinaryFormula(THF.FunTyConstructor, rl, rr)) =>
             solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, lv._2, rl))
-              ++ List(THF.BinaryFormula(THF.Eq, THF.QuantifiedFormula(THF.!>, lvl, lf), rr)), substitutions, obligations)
+              ++ List(THF.BinaryFormula(THF.Eq, THF.QuantifiedFormula(THF.!>, lvl, lf), rr)), substitutions)
           case THF.BinaryFormula(_, THF.BinaryFormula(THF.FunTyConstructor, ll, lr), THF.QuantifiedFormula(THF.!>, rv+:rvl, rf)) =>
             solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, ll, rv._2))
-              ++ List(THF.BinaryFormula(THF.Eq, lr, THF.QuantifiedFormula(THF.!>, rvl, rf))), substitutions, obligations)
+              ++ List(THF.BinaryFormula(THF.Eq, lr, THF.QuantifiedFormula(THF.!>, rvl, rf))), substitutions)
           case THF.BinaryFormula(_, THF.QuantifiedFormula(THF.!>, Nil, lf), r) =>
-            solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, lf, r)), substitutions, obligations)
+            solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, lf, r)), substitutions)
           case THF.BinaryFormula(_, l, THF.QuantifiedFormula(THF.!>, Nil, rf)) =>
-            solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, l, rf)), substitutions, obligations)
+            solveUnificationProblem(equations.tail ++ List(THF.BinaryFormula(THF.Eq, l, rf)), substitutions)
           case THF.BinaryFormula(_, ol@THF.Variable(l), or@THF.Variable(r)) =>
             val lNr = l.tail.toIntOption
             val rNr = r.tail.toIntOption
             val lgr = if (lNr != None && rNr != None) lNr.get > rNr.get else Ordering.String.gt(l, r)
             val rgl = if (lNr != None && rNr != None) rNr.get > lNr.get else Ordering.String.gt(r, l)
             if (!occurs(or, l) && lgr) {
-              return solveUnificationProblem(equations.tail map (x => variableReplace(x, (l, or))), (ol, or) :: (substitutions.map (x => (x._1, variableReplace(x._2, (l, or))))), obligations)
+              return solveUnificationProblem(equations.tail map (x => variableReplace(x, (l, or))), (ol, or) :: (substitutions.map (x => (x._1, variableReplace(x._2, (l, or))))))
             } else if (!occurs(ol, r) && rgl) {
-              return solveUnificationProblem(equations.tail map (x => variableReplace(x, (r, ol))), (or, ol) :: (substitutions.map (x => (x._1, variableReplace(x._2, (r, ol))))), obligations)
+              return solveUnificationProblem(equations.tail map (x => variableReplace(x, (r, ol))), (or, ol) :: (substitutions.map (x => (x._1, variableReplace(x._2, (r, ol))))))
             } else {
-              return solveUnificationProblem(equations.tail ++ List(equations.head), substitutions, obligations)
+              return solveUnificationProblem(equations.tail ++ List(equations.head), substitutions)
             }
           case THF.BinaryFormula(_, l@THF.Variable(n), r) =>
             if (!occurs(r, n))
-              solveUnificationProblem(equations.tail map (x => variableReplace(x, (n, r))), (l, r) :: (substitutions.map (x => (x._1, variableReplace(x._2, (n, r))))), obligations)
+              solveUnificationProblem(equations.tail map (x => variableReplace(x, (n, r))), (l, r) :: (substitutions.map (x => (x._1, variableReplace(x._2, (n, r))))))
             else
-              solveUnificationProblem(equations.tail ++ List(equations.head), substitutions, obligations)
+              solveUnificationProblem(equations.tail ++ List(equations.head), substitutions)
           case THF.BinaryFormula(_, l, r@(THF.Variable(n))) =>
             if (!occurs(l, n)) {
-              solveUnificationProblem(equations.tail map (x => variableReplace(x, (n, l))), (r, l) :: (substitutions.map (x => (x._1, variableReplace(x._2, (n, l))))), obligations)
+              solveUnificationProblem(equations.tail map (x => variableReplace(x, (n, l))), (r, l) :: (substitutions.map (x => (x._1, variableReplace(x._2, (n, l))))))
             } else {
-              solveUnificationProblem(equations.tail ++ List(equations.head), substitutions, obligations)
+              solveUnificationProblem(equations.tail ++ List(equations.head), substitutions)
             }
           case THF.BinaryFormula(THF.Eq, l, r) =>
             throw new TypeErrorException(l,r)  
@@ -484,7 +482,7 @@ object DHOLTCC extends EmbeddingN {
             throw new EmbeddingException("Non-Equality handed to unification problem: " + x.pretty)
         }
       } else {
-        return (substitutions, obligations)
+        return substitutions
       }
     }
 
