@@ -85,11 +85,11 @@ object DHOLTCC extends EmbeddingN {
 
       val constants = typeFormulas map {case TPTP.THFAnnotated(_, _, THF.Typing(n, t), _) => (n, t)}
 //      println("in typecheck conjecture") //DEBUG
-      val obligations = checkType(List[(String, THF.Type)](), constants.toList, List[THF.Formula]())(conjecture, bool).filter(x => x.exists(y => y.role == "conjecture"))
+      val obligations = checkType(List[THF.TypedVariable](), constants.toList, List[THF.Formula]())(conjecture, bool).filter(x => x.exists(y => y.role == "conjecture"))
       obligations.map(x => TPTP.Problem(problem.includes, contextFormulas.toList ++ x, Map.empty))
     }
 
-    private def genObligationFormula(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)], context: List[THF.Formula])(a: THF.Type, b:THF.Type): List[TPTP.THFAnnotated] = {
+    private def genObligationFormula(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)], context: List[THF.Formula])(a: THF.Type, b:THF.Type): List[TPTP.THFAnnotated] = {
       val conj:THF.Formula = THF.BinaryFormula(THF.Eq, a, b)
       val usedVars = (context++List(conj)).flatMap(y => (variables.filter(x => occurs(y, x._1)))).distinct
       var witnesses = usedVars
@@ -112,7 +112,7 @@ object DHOLTCC extends EmbeddingN {
       return newFormulas
     }
 
-    private def genObligation(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)], context: List[THF.Formula])(a: THF.Type, b:THF.Type): List[List[TPTP.THFAnnotated]] = (a, b) match {
+    private def genObligation(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)], context: List[THF.Formula])(a: THF.Type, b:THF.Type): List[List[TPTP.THFAnnotated]] = (a, b) match {
       case (a, b) if (a == b) => Nil
       case (THF.QuantifiedFormula(THF.!>, ahead::avl, af), THF.QuantifiedFormula(THF.!>, bhead::bvl, bf)) =>
         genObligation(variables, constants, context)(ahead._2, bhead._2) ++
@@ -138,7 +138,7 @@ object DHOLTCC extends EmbeddingN {
     }
 
     //Check simply typed skeleton
-    private def checkType(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)], context: List[THF.Formula])(formula: THF.Formula, targetType: THF.Type): List[List[TPTP.THFAnnotated]] = {
+    private def checkType(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)], context: List[THF.Formula])(formula: THF.Formula, targetType: THF.Type): List[List[TPTP.THFAnnotated]] = {
       def getArgTypes(formula: THF.Formula): List[THF.Type] = formula match {
         case THF.BinaryFormula(THF.FunTyConstructor, a, b) => a :: getArgTypes(b)
         case THF.QuantifiedFormula(THF.!>, Nil, f) => getArgTypes(f)
@@ -316,7 +316,7 @@ object DHOLTCC extends EmbeddingN {
       auxUnApply(formula, Nil)
     }
 
-    private def properInferType(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)])(formula: THF.Formula): List[(THF.Variable, THF.Type)] = { 
+    private def properInferType(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)])(formula: THF.Formula): List[(THF.Variable, THF.Type)] = { 
       var varCnt = 0
       def getFreshTypeVar: THF.Type = { //the typos are features and prevent clashes with names in the problem file (:
         varCnt += 1
@@ -326,7 +326,7 @@ object DHOLTCC extends EmbeddingN {
         varCnt += 1
         "FreshIntorducedVarName"+(varCnt-1)
       }
-      def properInferTypeAux(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)], arguments: List[THF.Formula])(f: THF.Formula, t: THF.Type): List[THF.BinaryFormula] = {
+      def properInferTypeAux(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)], arguments: List[THF.Formula])(f: THF.Formula, t: THF.Type): List[THF.BinaryFormula] = {
 //        println("infering type of: " + f.pretty + "( " + f + " )")
         f match {
           case THF.FunctionTerm(n, _) =>
@@ -399,7 +399,7 @@ object DHOLTCC extends EmbeddingN {
         throw new EmbeddingException("Can't unsavely apply argument " + argument.pretty + " to function " + formula)
     }
 
-    private def applyFunction(variables: List[(String, THF.Type)], constants: List[(String, THF.Type)], context: List[THF.Formula])(formula: THF.Formula, argument: THF.Formula) = formula match {
+    private def applyFunction(variables: List[THF.TypedVariable], constants: List[(String, THF.Type)], context: List[THF.Formula])(formula: THF.Formula, argument: THF.Formula) = formula match {
       case THF.QuantifiedFormula(THF.!>, v+:Nil, f) =>
         if(checkType(variables, constants, context)(argument, v._2) == Nil) //pretty inefficient, maybe reconsider
           variableReplace(f, (v._1, argument))

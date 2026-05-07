@@ -169,7 +169,7 @@ object DHOLEmbedding extends Embedding {
 
                   val convertedBody = convertFormula(body, variableList.toList++variables)
 
-                  def relativizeVar(connective: THF.BinaryConnective)(v: (String, THF.Type), body: THF.Formula) = v match {
+                  def relativizeVar(connective: THF.BinaryConnective)(v: THF.TypedVariable, body: THF.Formula) = v match {
                     case (str, tp@THF.FunctionTerm(n, _)) =>
                       body
                     case (str, tp) =>
@@ -201,7 +201,7 @@ object DHOLEmbedding extends Embedding {
       * @return simply typed analogue to the argument
       */
     private def convertPi(tp: THF.Type): THF.Type = {
-      def innerConvertPi(variableList: Seq[(String, THF.Type)], ret: THF.Type): THF.Type = variableList match {
+      def innerConvertPi(variableList: Seq[THF.TypedVariable], ret: THF.Type): THF.Type = variableList match {
         case (_, tp)+:shorterList =>
           val body = THF.QuantifiedFormula(THF.!>, shorterList, ret)
           FuncType(tp, innerConvertPi(shorterList, ret))
@@ -382,7 +382,7 @@ object DHOLEmbedding extends Embedding {
         val convertedType = normalizeNestedPi(convertType(typ, variables))
         var declType: THF.Type = convertedType
         val base = atomicTerm(symbol)
-        def typeRelDecls(variableList: Seq[(String, THF.Type)], typetype: THF.Type): List[TPTP.THFAnnotated] = {
+        def typeRelDecls(variableList: Seq[THF.TypedVariable], typetype: THF.Type): List[TPTP.THFAnnotated] = {
           val vars = generatePolyVariables(typetype, variables)
           variables = vars++variables
           val preDeclTp = if (vars == Nil) {
